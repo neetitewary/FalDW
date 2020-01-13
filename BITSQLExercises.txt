@@ -1,0 +1,238 @@
+Exercise 1. 
+Table Employee has the following columns: EmployeeId, EmployeeName, EmployeeTitle, ManagerId. 
+Column ManagerId represents self-referencing relationship between Manager and Employee. 
+Please write a query in T-SQL that returns the following columns:
+EmployeeId, EmployeeName, EmployeeTitle, ManagerId, ManagerName, DirectorName (Employee who does not have Manager), 
+Position Breadcrumbs (concatenation of Employee`s Name and names of all his/her managers). 
+
+Query Result :
+
+WITH DirectReports(Name,Title, EmployeeID, EmployeeLevel,DirectorName,PositionBreadCrumbs,ManagerID)  
+AS (
+SELECT 
+        e.EmployeeName,  
+        e.EmployeeTitle,  
+        e.EmployeeID,  
+        1,  
+        CONVERT(varchar(255), e.EmployeeName),
+		CONVERT(varchar(255), e.EmployeeName),
+		e.ManagerID
+        FROM tEmployeeList AS e  
+        WHERE e.ManagerID IS NULL  
+		UNION ALL  
+		SELECT 
+	    e.EmployeeName,  
+        e.EmployeeTitle,  
+        e.EmployeeID,  
+        EmployeeLevel + 1,
+		DirectorName,
+	    CONVERT (varchar(255), RTRIM(PositionBreadCrumbs) + '|' + EmployeeName)  name,
+		e.ManagerID
+		
+		FROM tEmployeeList AS e  
+		JOIN DirectReports AS d ON e.ManagerID = d.EmployeeID  
+		)  
+    
+	SELECT e1.EmployeeID,e1.Name as EmployeeName,e1.Title as EmployeeTitle,
+	coalesce(e1.managerid,e1.employeeid,e1.managerid) as Managerid,
+	case 
+	when e1.managerid IS NULL then e1.Name
+	else e2.employeename END 
+	as ManagerName,
+	e1.DirectorName,
+	e1.PositionBreadCrumbs
+	FROM DirectReports e1 
+	left join tEmployeeList e2 
+	on e1.managerid = e2.EmployeeID
+ORDER BY EmployeeID;
+
+
+**-----------------------------------------------------------------------------------------------------------------------
+
+
+Exercise 2.
+
+Please write a query in T-SQL that returns the following columns:
+Calendar Date, Employee, Department, Salary, First Employee`s Salary by Date, Employee Salary from previous period, 
+Employee Salary from following period, Summarized Salary from all Department, Cumulative Sum of Departments Salary
+ 
+Query Result :
+
+select  a.CalendarDate as Cal, a.Employee, a.Salary, a.Department,
+MIN(a.Salary) over (PARTITION by A.employee) AS FirstSalary,
+Lag(a.Salary, 1, NULL) OVER (partition BY a.employee  order BY a.employee ) as PreviousSalary,
+Lead(a.Salary, 1, NULL) OVER (partition BY a.employee  order BY a.employee ) as NextSalary,
+Sum(a.Salary) OVER (partition by a.Department, a.CalendarDate) as SumOfDepartmentSalary,
+Sum(a.Salary) OVER (partition by a.Department order by a.CalendarDate) as SumOfDepartmentSalary
+from tsalary a
+order by a.employee
+
+
+**-----------------------------------------------------------------------------------------------------------------------
+
+
+Exercise 3 :
+
+Please write code in T-SQL that mimic process of loading Dimension Employee with following technical specification.
+Target Datawarehouse table has name Dimension.Employee and has unique key.
+Attributes of the dimension must meet following requirements:
+•	Employee Id - Business key from Source System
+•	Employee Name - Keep only the last value for all historical records (SCD Type I)
+•	Employee Title - track history (SCD Type II). Every change is represented as a new record.
+•	Manager Id - track history (SCD Type II). Every change is represented as a new record.
+•	Salary Number - do not keep history, it persists only the firstly added value (SCD Type 0)
+
+Query Result :
+
+CREATE PROCEDURE dbo.MergeDimEmployee
+AS
+BEGIN
+
+DECLARE @CurrentDateTime datetime
+DECLARE @MinDateTime datetime
+DECLARE @MaxDateTime datetime
+
+SELECT
+	@CurrentDateTime = cast(getdate() as datetime),
+	@MinDateTime = cast('1900-01-01' as datetime),
+	@MaxDateTime = cast('9999-12-31' as datetime)
+
+
+-- ==================================================
+-- SCD1
+-- ==================================================
+MERGE [Dimension].[Employee] as [target]
+USING
+(
+	SELECT
+		[EmployeeId],
+		[EmployeeName],
+		[EmployeeTitle],
+		[ManagerId],
+		[Salary]
+	FROM [Staging].[Employee]
+) as [source]
+ON
+(
+	[source].[EmployeeId] = [target].[EmployeeId]
+)
+
+WHEN MATCHED AND
+(
+	([target].[EndDate] = @MaxDateTime OR ([target].[EndDate] IS NULL AND @MaxDateTime IS NULL))
+)
+AND
+(
+	([source].[EmployeeName] <> [target].[EmployeeName] OR ([source].[EmployeeName] IS NULL AND [target].[EmployeeName] IS NOT NULL) OR ([source].[EmployeeName] IS NOT NULL AND [target].[EmployeeName] IS NULL))
+)
+AND
+(
+	([source].[EmployeeTitle] = [target].[EmployeeTitle] OR ([source].[EmployeeTitle] IS NULL AND [target].[EmployeeTitle] IS NULL))AND
+	([source].[ManagerId] = [target].[ManagerId] OR ([source].[ManagerId] IS NULL AND [target].[ManagerId] IS NULL))
+)
+THEN UPDATE
+SET
+	[target].[EmployeeName] = [source].[EmployeeName],
+	[target].[ScdVersion] = [target].[ScdVersion] + 1
+;
+
+
+-- ==================================================
+-- SCD2
+-- ==================================================
+INSERT INTO [Dimension].[Employee]
+(
+	[EmployeeId],
+	[EmployeeName],
+	[EmployeeTitle],
+	[EndDate],
+	[ManagerId],
+	[Salary],
+	[ScdVersion],
+	[StartDate]
+)
+SELECT
+	[EmployeeId],
+	[EmployeeName],
+	[EmployeeTitle],
+	[EndDate],
+	[ManagerId],
+	[Salary],
+	[ScdVersion],
+	[StartDate]
+FROM
+(
+	MERGE [Dimension].[Employee] as [target]
+	USING
+	(
+		SELECT
+			[EmployeeId],
+			[EmployeeName],
+			[EmployeeTitle],
+			[ManagerId],
+			[Salary]
+		FROM [Staging].[Employee]
+
+	) as [source]
+	ON
+	(
+		[source].[EmployeeId] = [target].[EmployeeId]
+	)
+
+	WHEN NOT MATCHED BY TARGET
+	THEN INSERT
+	(
+		[EmployeeId],
+		[EmployeeName],
+		[EmployeeTitle],
+		[EndDate],
+		[ManagerId],
+		[Salary],
+		[ScdVersion],
+		[StartDate]
+	)
+	VALUES
+	(
+		[EmployeeId],
+		[EmployeeName],
+		[EmployeeTitle],
+		@MaxDateTime,
+		[ManagerId],
+		[Salary],
+		1,
+		@MinDateTime
+	)
+
+
+WHEN MATCHED AND
+(
+	([EndDate] = @MaxDateTime OR ([EndDate] IS NULL AND @MaxDateTime IS NULL))
+)
+AND
+(
+	([target].[EmployeeTitle] <> [source].[EmployeeTitle] OR ([target].[EmployeeTitle] IS NULL AND [source].[EmployeeTitle] IS NOT NULL) OR ([target].[EmployeeTitle] IS NOT NULL AND [source].[EmployeeTitle] IS NULL)) OR
+	([target].[ManagerId] <> [source].[ManagerId] OR ([target].[ManagerId] IS NULL AND [source].[ManagerId] IS NOT NULL) OR ([target].[ManagerId] IS NOT NULL AND [source].[ManagerId] IS NULL))
+
+)
+	THEN UPDATE
+	SET
+		[EndDate] = @CurrentDateTime
+
+
+	OUTPUT
+		$Action as [MERGE_ACTION_6f4a6b43-cca0-4746-8626-276a928de331],
+		[source].[EmployeeId] AS [EmployeeId],
+		[source].[EmployeeName] AS [EmployeeName],
+		[source].[EmployeeTitle] AS [EmployeeTitle],
+		@MaxDateTime AS [EndDate],
+		[source].[ManagerId] AS [ManagerId],
+		[source].[Salary] AS [Salary],
+		INSERTED.[ScdVersion] + 1 AS [ScdVersion],
+		@CurrentDateTime AS [StartDate]
+
+)MERGE_OUTPUT
+WHERE MERGE_OUTPUT.[MERGE_ACTION_6f4a6b43-cca0-4746-8626-276a928de331] = 'UPDATE' 
+	AND MERGE_OUTPUT.[EmployeeId] IS NOT NULL
+;
+END
+GO
