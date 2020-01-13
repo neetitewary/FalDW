@@ -1,0 +1,291 @@
+{
+	"name": "EmployeeLoadPipeline",
+	"properties": {
+		"activities": [
+			{
+				"name": "CopySqlServerToAzureBlobActivity",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"queryTimeout": "02:00:00"
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "Employee Key",
+									"type": "Int32"
+								},
+								"sink": {
+									"type": "String",
+									"ordinal": 1
+								}
+							},
+							{
+								"source": {
+									"name": "WWI Employee ID",
+									"type": "Int32"
+								},
+								"sink": {
+									"type": "String",
+									"ordinal": 2
+								}
+							},
+							{
+								"source": {
+									"name": "Employee",
+									"type": "String"
+								},
+								"sink": {
+									"type": "String",
+									"ordinal": 3
+								}
+							},
+							{
+								"source": {
+									"name": "Preferred Name",
+									"type": "String"
+								},
+								"sink": {
+									"type": "String",
+									"ordinal": 4
+								}
+							},
+							{
+								"source": {
+									"name": "Is Salesperson",
+									"type": "Boolean"
+								},
+								"sink": {
+									"type": "String",
+									"ordinal": 5
+								}
+							},
+							{
+								"source": {
+									"name": "Photo",
+									"type": "Byte[]"
+								},
+								"sink": {
+									"type": "String",
+									"ordinal": 6
+								}
+							},
+							{
+								"source": {
+									"name": "Valid From",
+									"type": "DateTime"
+								},
+								"sink": {
+									"type": "String",
+									"ordinal": 7
+								}
+							},
+							{
+								"source": {
+									"name": "Valid To",
+									"type": "DateTime"
+								},
+								"sink": {
+									"type": "String",
+									"ordinal": 8
+								}
+							},
+							{
+								"source": {
+									"name": "Lineage Key",
+									"type": "Int32"
+								},
+								"sink": {
+									"type": "String",
+									"ordinal": 9
+								}
+							}
+						]
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "SqlServerDataset",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "AzureBlobDataset",
+						"type": "DatasetReference"
+					}
+				]
+			},
+			{
+				"name": "CopyFromBlobToSqlpipeline",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "CopySqlServerToAzureBlobActivity",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"tableOption": "autoCreate"
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"type": "String",
+									"ordinal": 1
+								},
+								"sink": {
+									"name": "Employee Key",
+									"type": "Int32"
+								}
+							},
+							{
+								"source": {
+									"type": "String",
+									"ordinal": 2
+								},
+								"sink": {
+									"name": "WWI Employee ID",
+									"type": "Int32"
+								}
+							},
+							{
+								"source": {
+									"type": "String",
+									"ordinal": 3
+								},
+								"sink": {
+									"name": "Employee",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"type": "String",
+									"ordinal": 4
+								},
+								"sink": {
+									"name": "Preferred Name",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"type": "String",
+									"ordinal": 5
+								},
+								"sink": {
+									"name": "Is Salesperson",
+									"type": "Boolean"
+								}
+							},
+							{
+								"source": {
+									"type": "String",
+									"ordinal": 6
+								},
+								"sink": {
+									"name": "Photo",
+									"type": "Byte[]"
+								}
+							},
+							{
+								"source": {
+									"type": "String",
+									"ordinal": 7
+								},
+								"sink": {
+									"name": "Valid From",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"type": "String",
+									"ordinal": 8
+								},
+								"sink": {
+									"name": "Valid To",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"type": "String",
+									"ordinal": 9
+								},
+								"sink": {
+									"name": "Lineage Key",
+									"type": "Int32"
+								}
+							}
+						]
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DelimitedText",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "OutputSqlDataset",
+						"type": "DatasetReference"
+					}
+				]
+			}
+		],
+		"annotations": []
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

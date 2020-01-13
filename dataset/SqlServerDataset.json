@@ -1,0 +1,59 @@
+{
+	"name": "SqlServerDataset",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "SqlServerLinkedService",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "SqlServerTable",
+		"schema": [
+			{
+				"name": "Employee Key",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "WWI Employee ID",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "Employee",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Preferred Name",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Is Salesperson",
+				"type": "bit"
+			},
+			{
+				"name": "Photo",
+				"type": "varbinary"
+			},
+			{
+				"name": "Valid From",
+				"type": "datetime2",
+				"scale": 7
+			},
+			{
+				"name": "Valid To",
+				"type": "datetime2",
+				"scale": 7
+			},
+			{
+				"name": "Lineage Key",
+				"type": "int",
+				"precision": 10
+			}
+		],
+		"typeProperties": {
+			"schema": "Dimension",
+			"table": "Employee"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
